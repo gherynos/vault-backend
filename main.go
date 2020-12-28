@@ -1,6 +1,6 @@
 package main
 
-import "vault-backend/server"
+import "github.com/gherynos/vault-backend/server"
 
 func main() {
 
