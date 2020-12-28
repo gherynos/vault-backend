@@ -1,0 +1,47 @@
+---
+# yamllint disable rule:line-length
+default_language_version:
+  python: python3.7
+exclude: (CMakeFiles|cmake_modules|docs|target)\/
+repos:
+  - repo: git://github.com/pre-commit/pre-commit-hooks
+    rev: v2.5.0
+    hooks:
+      - id: check-json
+      - id: check-merge-conflict
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-xml
+      - id: check-added-large-files
+      - id: pretty-format-json
+        args:
+          - --autofix
+      - id: detect-private-key
+  - repo: git://github.com/Lucas-C/pre-commit-hooks
+    rev: v1.1.7
+    hooks:
+      - id: forbid-tabs
+        exclude_types:
+          - javascript
+          - dtd
+          - markdown
+          - makefile
+          - xml
+          - css
+          - svg
+          - go
+        exclude: binary|\.bin|go.mod$
+  - repo: git://github.com/igorshubovych/markdownlint-cli
+    rev: v0.22.0
+    hooks:
+      - id: markdownlint
+  - repo: git://github.com/adrienverge/yamllint
+    rev: v1.20.0
+    hooks:
+      - id: yamllint
+  - repo: git://github.com/dnephin/pre-commit-golang
+    rev: v0.3.5
+    hooks:
+      - id: go-fmt
+      - id: go-imports
