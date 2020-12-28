@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	s "github.com/gherynos/vault-backend/store"
 	log "github.com/sirupsen/logrus"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
-	s "vault-backend/store"
 )
 
 const Version = "0.1.0"

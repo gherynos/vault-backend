@@ -3,11 +3,11 @@ package vault
 import (
 	"errors"
 	"fmt"
+	s "github.com/gherynos/vault-backend/store"
 	"github.com/hashicorp/vault/api"
 	log "github.com/sirupsen/logrus"
 	"sync"
 	"time"
-	s "vault-backend/store"
 )
 
 type Vault struct {

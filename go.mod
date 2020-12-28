@@ -1,8 +1,8 @@
-module vault-backend
+module github.com/gherynos/vault-backend
 
 go 1.15
 
-replace vault-backend/server => ./server
+replace github.com/gherynos/vault-backend/server => ./server
 
 require (
 	github.com/hashicorp/vault/api v1.0.4

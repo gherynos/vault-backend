@@ -2,11 +2,11 @@ package server
 
 import (
 	"encoding/base64"
+	s "github.com/gherynos/vault-backend/store"
+	"github.com/gherynos/vault-backend/vault"
 	log "github.com/sirupsen/logrus"
 	"strings"
 	"sync"
-	s "vault-backend/store"
-	"vault-backend/vault"
 )
 
 type VaultPool struct {
