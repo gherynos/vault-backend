@@ -2,7 +2,7 @@
 
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
 ![build](https://github.com/gherynos/vault-backend/workflows/build/badge.svg)
-![release](https://github.com/gherynos/vault-backend/workflows/build/release.svg)
+![release](https://github.com/gherynos/vault-backend/workflows/release/badge.svg)
 
 A Terraform [HTTP backend](https://www.terraform.io/docs/backends/types/http.html) that stores the state in a [Vault secret](https://www.vaultproject.io/docs/secrets/kv/kv-v2).
 
