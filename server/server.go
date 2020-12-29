@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	s "github.com/gherynos/vault-backend/store"
+	"github.com/hashicorp/vault/api"
 	log "github.com/sirupsen/logrus"
 	"io"
 	"io/ioutil"
@@ -52,7 +53,21 @@ func stateHandler(pool s.Pool, w http.ResponseWriter, r *http.Request) (int, str
 	store, err = pool.Get(userPassEnc)
 	if err != nil {
 
-		return http.StatusUnauthorized, "Error while connecting to Vault"
+		switch err.(type) {
+
+		case *api.ResponseError:
+			{
+				re := err.(*api.ResponseError)
+				logger.Debugf("error connecting to Vault: %d - %s", re.StatusCode, re.Error())
+				return re.StatusCode, re.Error()
+			}
+
+		default:
+			{
+				logger.WithError(err).Error("error connecting to Vault")
+				return http.StatusServiceUnavailable, http.StatusText(http.StatusServiceUnavailable)
+			}
+		}
 	}
 
 	switch r.Method {
@@ -68,6 +83,12 @@ func stateHandler(pool s.Pool, w http.ResponseWriter, r *http.Request) (int, str
 
 				case *s.ItemNotFoundError:
 					return http.StatusNotFound, http.StatusText(http.StatusNotFound)
+
+				case *api.ResponseError:
+					{
+						re := err.(*api.ResponseError)
+						return re.StatusCode, re.Error()
+					}
 
 				default:
 					{
@@ -98,6 +119,12 @@ func stateHandler(pool s.Pool, w http.ResponseWriter, r *http.Request) (int, str
 				case *s.ItemNotFoundError:
 					return http.StatusUnprocessableEntity, http.StatusText(http.StatusUnprocessableEntity)
 
+				case *api.ResponseError:
+					{
+						re := err.(*api.ResponseError)
+						return re.StatusCode, re.Error()
+					}
+
 				default:
 					{
 						logger.WithError(err).Error("unable to check lock")
@@ -119,8 +146,20 @@ func stateHandler(pool s.Pool, w http.ResponseWriter, r *http.Request) (int, str
 
 				if err := store.SetBin(state, reqBody); err != nil {
 
-					logger.WithError(err).Error("unable to store state")
-					return http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError)
+					switch err.(type) {
+
+					case *api.ResponseError:
+						{
+							re := err.(*api.ResponseError)
+							return re.StatusCode, re.Error()
+						}
+
+					default:
+						{
+							logger.WithError(err).Error("unable to store state")
+							return http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError)
+						}
+					}
 				}
 
 				return 200, ""
@@ -154,6 +193,12 @@ func stateHandler(pool s.Pool, w http.ResponseWriter, r *http.Request) (int, str
 						}
 
 						return 200, ""
+					}
+
+				case *api.ResponseError:
+					{
+						re := err.(*api.ResponseError)
+						return re.StatusCode, re.Error()
 					}
 
 				default:
@@ -191,6 +236,12 @@ func stateHandler(pool s.Pool, w http.ResponseWriter, r *http.Request) (int, str
 					case *s.ItemNotFoundError:
 						return http.StatusUnprocessableEntity, http.StatusText(http.StatusUnprocessableEntity)
 
+					case *api.ResponseError:
+						{
+							re := err.(*api.ResponseError)
+							return re.StatusCode, re.Error()
+						}
+
 					default:
 						{
 							logger.WithError(err).Error("unable to check lock")
@@ -206,8 +257,20 @@ func stateHandler(pool s.Pool, w http.ResponseWriter, r *http.Request) (int, str
 
 				if err := store.Delete(fmt.Sprintf("%s-lock", state)); err != nil {
 
-					logger.WithError(err).Error("unable to remove lock")
-					return http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError)
+					switch err.(type) {
+
+					case *api.ResponseError:
+						{
+							re := err.(*api.ResponseError)
+							return re.StatusCode, re.Error()
+						}
+
+					default:
+						{
+							logger.WithError(err).Error("unable to remove lock")
+							return http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError)
+						}
+					}
 				}
 
 				pool.Delete(userPassEnc)
