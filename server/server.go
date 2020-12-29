@@ -12,7 +12,7 @@ import (
 	"os"
 )
 
-const Version = "0.1.0"
+const Version = "0.2.0"
 
 func checkLockId(store s.Store, state, id string) (proceed bool, data string, err error) {
 
@@ -258,10 +258,20 @@ func RunServer() {
 	vaultURL := getEnv("VAULT_URL", "http://localhost:8200")
 	vaultPrefix := getEnv("VAULT_PREFIX", "vbk")
 	address := getEnv("LISTEN_ADDRESS", ":8080")
+	tlsCrt := getEnv("TLS_CRT", "")
+	tlsKey := getEnv("TLS_KEY", "")
 
 	log.Infof("Vault Backend version %s listening on %s", Version, address)
 	log.Debugf("Vault URL: %s, secret prefix: %s", vaultURL, vaultPrefix)
 
 	http.Handle("/state/", handler{NewVaultPool(vaultURL, vaultPrefix), stateHandler})
-	log.Fatal(http.ListenAndServe(address, nil))
+
+	if tlsCrt != "" && tlsKey != "" {
+
+		log.Fatal(http.ListenAndServeTLS(address, tlsCrt, tlsKey, nil))
+
+	} else {
+
+		log.Fatal(http.ListenAndServe(address, nil))
+	}
 }

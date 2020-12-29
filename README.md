@@ -41,6 +41,7 @@ The following environment variables can be set to change the configuration:
 - `VAULT_URL` (default `http://localhost:8200`) the URL of the Vault server
 - `VAULT_PREFIX` (default `vbk`) the prefix used when storing the secrets
 - `LISTEN_ADDRESS` (default `0.0.0.0:8080`) the listening address and port
+- `TLS_CRT` and `TLS_KEY` to set the path of the TLS certificate and key files
 - `DEBUG` to enable verbose logging
 
 ## Vault policy
