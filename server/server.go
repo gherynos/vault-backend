@@ -13,7 +13,7 @@ import (
 	"os"
 )
 
-const Version = "0.2.0"
+const Version = "0.3.0"
 
 func checkLockId(store s.Store, state, id string) (proceed bool, data string, err error) {
 
@@ -33,6 +33,213 @@ func checkLockId(store s.Store, state, id string) (proceed bool, data string, er
 
 	proceed = jData["ID"] == id
 	return
+}
+
+func stateHandlerGet(logger *log.Entry, store s.Store, state string, w http.ResponseWriter) (int, string) {
+
+	logger.Debug("Load state")
+
+	data, err := store.GetBin(state)
+	if err != nil {
+
+		switch err.(type) {
+
+		case *s.ItemNotFoundError:
+			return http.StatusNotFound, http.StatusText(http.StatusNotFound)
+
+		case *api.ResponseError:
+			{
+				re := err.(*api.ResponseError)
+				return re.StatusCode, re.Error()
+			}
+
+		default:
+			{
+				logger.WithError(err).Error("unable to get state")
+				return http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError)
+			}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if _, err := io.Copy(w, bytes.NewReader(data)); err != nil {
+
+		logger.WithError(err).Error("unable to return state")
+		return http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError)
+	}
+
+	return 200, ""
+}
+
+func stateHandlerPost(logger *log.Entry, store s.Store, state string, r *http.Request, w http.ResponseWriter) (int, string) {
+
+	logger.Debug("Store state")
+
+	if proceed, data, err := checkLockId(store, state, r.URL.Query().Get("ID")); err != nil {
+
+		switch err.(type) {
+
+		case *s.ItemNotFoundError:
+			return http.StatusUnprocessableEntity, http.StatusText(http.StatusUnprocessableEntity)
+
+		case *api.ResponseError:
+			{
+				re := err.(*api.ResponseError)
+				return re.StatusCode, re.Error()
+			}
+
+		default:
+			{
+				logger.WithError(err).Error("unable to check lock")
+				return http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError)
+			}
+		}
+
+	} else if !proceed {
+
+		w.Header().Set("Content-Type", "application/json")
+		return http.StatusLocked, data
+	}
+
+	if reqBody, err := ioutil.ReadAll(r.Body); err != nil {
+
+		return http.StatusBadRequest, http.StatusText(http.StatusBadRequest)
+
+	} else {
+
+		if err := store.SetBin(state, reqBody); err != nil {
+
+			switch err.(type) {
+
+			case *api.ResponseError:
+				{
+					re := err.(*api.ResponseError)
+					return re.StatusCode, re.Error()
+				}
+
+			default:
+				{
+					logger.WithError(err).Error("unable to store state")
+					return http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError)
+				}
+			}
+		}
+
+		return 200, ""
+	}
+}
+
+func stateHandlerLock(logger *log.Entry, store s.Store, state string, r *http.Request, w http.ResponseWriter) (int, string) {
+
+	logger.Debug("Lock state")
+
+	name := fmt.Sprintf("%s-lock", state)
+	data, err := store.GetBin(name)
+	if err != nil {
+
+		switch err.(type) {
+
+		case *s.ItemNotFoundError:
+			{
+
+				if reqBody, err := ioutil.ReadAll(r.Body); err != nil {
+
+					return http.StatusBadRequest, http.StatusText(http.StatusBadRequest)
+
+				} else {
+
+					if err := store.SetBin(name, reqBody); err != nil {
+
+						logger.WithError(err).Error("unable to store lock")
+						return http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError)
+					}
+				}
+
+				return 200, ""
+			}
+
+		case *api.ResponseError:
+			{
+				re := err.(*api.ResponseError)
+				return re.StatusCode, re.Error()
+			}
+
+		default:
+			{
+				logger.WithError(err).Error("unable to retrieve lock")
+				return http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError)
+			}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	return http.StatusConflict, string(data)
+}
+
+func stateHandlerUnlock(logger *log.Entry, store s.Store, state string, pool s.Pool, userPassEnc string, r *http.Request, w http.ResponseWriter) (int, string) {
+
+	logger.Debug("Unlock state")
+
+	if reqBody, err := ioutil.ReadAll(r.Body); err != nil {
+
+		return http.StatusBadRequest, http.StatusText(http.StatusBadRequest)
+
+	} else {
+
+		var body map[string]interface{}
+		if err := json.Unmarshal(reqBody, &body); err != nil {
+
+			return http.StatusBadRequest, http.StatusText(http.StatusBadRequest)
+		}
+
+		if proceed, data, err := checkLockId(store, state, body["ID"].(string)); err != nil {
+
+			switch err.(type) {
+
+			case *s.ItemNotFoundError:
+				return http.StatusUnprocessableEntity, http.StatusText(http.StatusUnprocessableEntity)
+
+			case *api.ResponseError:
+				{
+					re := err.(*api.ResponseError)
+					return re.StatusCode, re.Error()
+				}
+
+			default:
+				{
+					logger.WithError(err).Error("unable to check lock")
+					return http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError)
+				}
+			}
+
+		} else if !proceed {
+
+			w.Header().Set("Content-Type", "application/json")
+			return http.StatusConflict, data
+		}
+
+		if err := store.Delete(fmt.Sprintf("%s-lock", state)); err != nil {
+
+			switch err.(type) {
+
+			case *api.ResponseError:
+				{
+					re := err.(*api.ResponseError)
+					return re.StatusCode, re.Error()
+				}
+
+			default:
+				{
+					logger.WithError(err).Error("unable to remove lock")
+					return http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError)
+				}
+			}
+		}
+
+		pool.Delete(userPassEnc)
+
+		return 200, ""
+	}
 }
 
 func stateHandler(pool s.Pool, w http.ResponseWriter, r *http.Request) (int, string) {
@@ -74,209 +281,22 @@ func stateHandler(pool s.Pool, w http.ResponseWriter, r *http.Request) (int, str
 
 	case "GET":
 		{
-			logger.Debug("Load state")
-
-			data, err := store.GetBin(state)
-			if err != nil {
-
-				switch err.(type) {
-
-				case *s.ItemNotFoundError:
-					return http.StatusNotFound, http.StatusText(http.StatusNotFound)
-
-				case *api.ResponseError:
-					{
-						re := err.(*api.ResponseError)
-						return re.StatusCode, re.Error()
-					}
-
-				default:
-					{
-						logger.WithError(err).Error("unable to get state")
-						return http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError)
-					}
-				}
-			}
-
-			w.Header().Set("Content-Type", "application/json")
-			if _, err := io.Copy(w, bytes.NewReader(data)); err != nil {
-
-				logger.WithError(err).Error("unable to return state")
-				return http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError)
-			}
-
-			return 200, ""
+			return stateHandlerGet(logger, store, state, w)
 		}
 
 	case "POST":
 		{
-			logger.Debug("Store state")
-
-			if proceed, data, err := checkLockId(store, state, r.URL.Query().Get("ID")); err != nil {
-
-				switch err.(type) {
-
-				case *s.ItemNotFoundError:
-					return http.StatusUnprocessableEntity, http.StatusText(http.StatusUnprocessableEntity)
-
-				case *api.ResponseError:
-					{
-						re := err.(*api.ResponseError)
-						return re.StatusCode, re.Error()
-					}
-
-				default:
-					{
-						logger.WithError(err).Error("unable to check lock")
-						return http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError)
-					}
-				}
-
-			} else if !proceed {
-
-				w.Header().Set("Content-Type", "application/json")
-				return http.StatusLocked, data
-			}
-
-			if reqBody, err := ioutil.ReadAll(r.Body); err != nil {
-
-				return http.StatusBadRequest, http.StatusText(http.StatusBadRequest)
-
-			} else {
-
-				if err := store.SetBin(state, reqBody); err != nil {
-
-					switch err.(type) {
-
-					case *api.ResponseError:
-						{
-							re := err.(*api.ResponseError)
-							return re.StatusCode, re.Error()
-						}
-
-					default:
-						{
-							logger.WithError(err).Error("unable to store state")
-							return http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError)
-						}
-					}
-				}
-
-				return 200, ""
-			}
+			return stateHandlerPost(logger, store, state, r, w)
 		}
 
 	case "LOCK":
 		{
-			logger.Debug("Lock state")
-
-			name := fmt.Sprintf("%s-lock", state)
-			data, err := store.GetBin(name)
-			if err != nil {
-
-				switch err.(type) {
-
-				case *s.ItemNotFoundError:
-					{
-
-						if reqBody, err := ioutil.ReadAll(r.Body); err != nil {
-
-							return http.StatusBadRequest, http.StatusText(http.StatusBadRequest)
-
-						} else {
-
-							if err := store.SetBin(name, reqBody); err != nil {
-
-								logger.WithError(err).Error("unable to store lock")
-								return http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError)
-							}
-						}
-
-						return 200, ""
-					}
-
-				case *api.ResponseError:
-					{
-						re := err.(*api.ResponseError)
-						return re.StatusCode, re.Error()
-					}
-
-				default:
-					{
-						logger.WithError(err).Error("unable to retrieve lock")
-						return http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError)
-					}
-				}
-			}
-
-			w.Header().Set("Content-Type", "application/json")
-			return http.StatusConflict, string(data)
+			return stateHandlerLock(logger, store, state, r, w)
 		}
 
 	case "UNLOCK":
 		{
-			logger.Debug("Unlock state")
-
-			if reqBody, err := ioutil.ReadAll(r.Body); err != nil {
-
-				return http.StatusBadRequest, http.StatusText(http.StatusBadRequest)
-
-			} else {
-
-				var body map[string]interface{}
-				if err := json.Unmarshal(reqBody, &body); err != nil {
-
-					return http.StatusBadRequest, http.StatusText(http.StatusBadRequest)
-				}
-
-				if proceed, data, err := checkLockId(store, state, body["ID"].(string)); err != nil {
-
-					switch err.(type) {
-
-					case *s.ItemNotFoundError:
-						return http.StatusUnprocessableEntity, http.StatusText(http.StatusUnprocessableEntity)
-
-					case *api.ResponseError:
-						{
-							re := err.(*api.ResponseError)
-							return re.StatusCode, re.Error()
-						}
-
-					default:
-						{
-							logger.WithError(err).Error("unable to check lock")
-							return http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError)
-						}
-					}
-
-				} else if !proceed {
-
-					w.Header().Set("Content-Type", "application/json")
-					return http.StatusConflict, data
-				}
-
-				if err := store.Delete(fmt.Sprintf("%s-lock", state)); err != nil {
-
-					switch err.(type) {
-
-					case *api.ResponseError:
-						{
-							re := err.(*api.ResponseError)
-							return re.StatusCode, re.Error()
-						}
-
-					default:
-						{
-							logger.WithError(err).Error("unable to remove lock")
-							return http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError)
-						}
-					}
-				}
-
-				pool.Delete(userPassEnc)
-
-				return 200, ""
-			}
+			return stateHandlerUnlock(logger, store, state, pool, userPassEnc, r, w)
 		}
 
 	default:

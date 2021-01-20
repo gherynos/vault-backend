@@ -19,7 +19,22 @@ type Vault struct {
 	m sync.Mutex
 }
 
-func New(vaultURL, roleId, secretId, prefix string) (*Vault, error) {
+func NewWithToken(vaultURL, token, prefix string) (*Vault, error) {
+
+	var v Vault
+	var err error
+	if v.client, err = api.NewClient(&api.Config{Address: vaultURL}); err != nil {
+
+		return nil, err
+	}
+
+	v.prefix = prefix
+	v.client.SetToken(token)
+
+	return &v, nil
+}
+
+func NewWithAppRole(vaultURL, roleId, secretId, prefix string) (*Vault, error) {
 
 	var v Vault
 	var err error
@@ -65,6 +80,12 @@ func (v *Vault) authenticate() error {
 }
 
 func (v *Vault) refreshToken() error {
+
+	// only refresh the token when using AppRole
+	if v.roleId == "" && v.secretId == "" {
+
+		return nil
+	}
 
 	// re-authenticate if the token has expired
 	v.m.Lock()

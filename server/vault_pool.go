@@ -46,7 +46,14 @@ func (vp *VaultPool) Get(identifier string) (val s.Store, err error) {
 
 		userPass := strings.Split(string(dec), ":")
 		var vt *vault.Vault
-		vt, err = vault.New(vp.vaultURL, userPass[0], userPass[1], vp.prefix)
+		if userPass[0] == "TOKEN" {
+
+			vt, err = vault.NewWithToken(vp.vaultURL, userPass[1], vp.prefix)
+
+		} else {
+
+			vt, err = vault.NewWithAppRole(vp.vaultURL, userPass[0], userPass[1], vp.prefix)
+		}
 		if err != nil {
 
 			return
