@@ -3,6 +3,7 @@
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
 ![build](https://github.com/gherynos/vault-backend/workflows/build/badge.svg)
 ![release](https://github.com/gherynos/vault-backend/workflows/release/badge.svg)
+[![go-report-card](https://goreportcard.com/badge/github.com/gherynos/vault-backend)](https://goreportcard.com/report/github.com/gherynos/vault-backend)
 
 A Terraform [HTTP backend](https://www.terraform.io/docs/backends/types/http.html) that stores the state in a [Vault secret](https://www.vaultproject.io/docs/secrets/kv/kv-v2).
 
@@ -10,7 +11,7 @@ The server supports locking and leverages the versioning capabilities of Vault b
 
 ## Terraform config
 
-The server authenticates to Vault using [AppRole](https://www.vaultproject.io/docs/auth/approle), with `role_id` and `secret_id` passed respectively as the `username` and `password` in the configuration.
+The server authenticates to Vault using [AppRole](https://www.vaultproject.io/docs/auth/approle), with `role_id` and `secret_id` passed respectively as the `username` and `password` in the configuration:
 
 ```terraform
 terraform {
@@ -25,6 +26,21 @@ terraform {
 }
 ```
 
+or directly with a [token](https://www.vaultproject.io/docs/auth/token):
+
+```terraform
+terraform {
+  backend "http" {
+    address = "http://localhost:8080/state/<STATE_NAME>"
+    lock_address = "http://localhost:8080/state/<STATE_NAME>"
+    unlock_address = "http://localhost:8080/state/<STATE_NAME>"
+
+    username = "TOKEN"
+    password = "<TOKEN_VALUE>"
+  }
+}
+```
+
 where `<STATE_NAME>` is an arbitrary value used to distinguish the backends.
 
 With the above configuration, Terraform connects to a vault-backend server running locally on port 8080 when loading/storing/locking the state, and the server manages the following secrets in Vault:
@@ -32,7 +48,7 @@ With the above configuration, Terraform connects to a vault-backend server runni
 - `/secret/vbk/<STATE_NAME>`
 - `/secret/vbk/<STATE_NAME>-lock`
 
-The latter created when a lock is acquired and deleted when released.
+the latter gets created when a lock is acquired and deleted when released.
 
 ## Vault Backend config
 
@@ -73,4 +89,4 @@ path "secret/metadata/vbk/cloud-services-lock"
 
 ## License
 
-vault-backend is licensed under the [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0).
+Vault Backend is licensed under the [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0).

@@ -13,9 +13,10 @@ import (
 	"os"
 )
 
+// Version defines the version of the server
 const Version = "0.3.0"
 
-func checkLockId(store s.Store, state, id string) (proceed bool, data string, err error) {
+func checkLockID(store s.Store, state, id string) (proceed bool, data string, err error) {
 
 	var value []byte
 	if value, err = store.GetBin(fmt.Sprintf("%s-lock", state)); err != nil {
@@ -75,7 +76,7 @@ func stateHandlerPost(logger *log.Entry, store s.Store, state string, r *http.Re
 
 	logger.Debug("Store state")
 
-	if proceed, data, err := checkLockId(store, state, r.URL.Query().Get("ID")); err != nil {
+	if proceed, data, err := checkLockID(store, state, r.URL.Query().Get("ID")); err != nil {
 
 		switch err.(type) {
 
@@ -101,32 +102,32 @@ func stateHandlerPost(logger *log.Entry, store s.Store, state string, r *http.Re
 		return http.StatusLocked, data
 	}
 
-	if reqBody, err := ioutil.ReadAll(r.Body); err != nil {
+	var reqBody []byte
+	var err error
+	if reqBody, err = ioutil.ReadAll(r.Body); err != nil {
 
 		return http.StatusBadRequest, http.StatusText(http.StatusBadRequest)
+	}
 
-	} else {
+	if err := store.SetBin(state, reqBody); err != nil {
 
-		if err := store.SetBin(state, reqBody); err != nil {
+		switch err.(type) {
 
-			switch err.(type) {
+		case *api.ResponseError:
+			{
+				re := err.(*api.ResponseError)
+				return re.StatusCode, re.Error()
+			}
 
-			case *api.ResponseError:
-				{
-					re := err.(*api.ResponseError)
-					return re.StatusCode, re.Error()
-				}
-
-			default:
-				{
-					logger.WithError(err).Error("unable to store state")
-					return http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError)
-				}
+		default:
+			{
+				logger.WithError(err).Error("unable to store state")
+				return http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError)
 			}
 		}
-
-		return 200, ""
 	}
+
+	return 200, ""
 }
 
 func stateHandlerLock(logger *log.Entry, store s.Store, state string, r *http.Request, w http.ResponseWriter) (int, string) {
@@ -141,18 +142,17 @@ func stateHandlerLock(logger *log.Entry, store s.Store, state string, r *http.Re
 
 		case *s.ItemNotFoundError:
 			{
-
-				if reqBody, err := ioutil.ReadAll(r.Body); err != nil {
+				var reqBody []byte
+				var err error
+				if reqBody, err = ioutil.ReadAll(r.Body); err != nil {
 
 					return http.StatusBadRequest, http.StatusText(http.StatusBadRequest)
+				}
 
-				} else {
+				if err := store.SetBin(name, reqBody); err != nil {
 
-					if err := store.SetBin(name, reqBody); err != nil {
-
-						logger.WithError(err).Error("unable to store lock")
-						return http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError)
-					}
+					logger.WithError(err).Error("unable to store lock")
+					return http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError)
 				}
 
 				return 200, ""
@@ -180,66 +180,66 @@ func stateHandlerUnlock(logger *log.Entry, store s.Store, state string, pool s.P
 
 	logger.Debug("Unlock state")
 
-	if reqBody, err := ioutil.ReadAll(r.Body); err != nil {
+	var reqBody []byte
+	var err error
+	if reqBody, err = ioutil.ReadAll(r.Body); err != nil {
 
 		return http.StatusBadRequest, http.StatusText(http.StatusBadRequest)
-
-	} else {
-
-		var body map[string]interface{}
-		if err := json.Unmarshal(reqBody, &body); err != nil {
-
-			return http.StatusBadRequest, http.StatusText(http.StatusBadRequest)
-		}
-
-		if proceed, data, err := checkLockId(store, state, body["ID"].(string)); err != nil {
-
-			switch err.(type) {
-
-			case *s.ItemNotFoundError:
-				return http.StatusUnprocessableEntity, http.StatusText(http.StatusUnprocessableEntity)
-
-			case *api.ResponseError:
-				{
-					re := err.(*api.ResponseError)
-					return re.StatusCode, re.Error()
-				}
-
-			default:
-				{
-					logger.WithError(err).Error("unable to check lock")
-					return http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError)
-				}
-			}
-
-		} else if !proceed {
-
-			w.Header().Set("Content-Type", "application/json")
-			return http.StatusConflict, data
-		}
-
-		if err := store.Delete(fmt.Sprintf("%s-lock", state)); err != nil {
-
-			switch err.(type) {
-
-			case *api.ResponseError:
-				{
-					re := err.(*api.ResponseError)
-					return re.StatusCode, re.Error()
-				}
-
-			default:
-				{
-					logger.WithError(err).Error("unable to remove lock")
-					return http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError)
-				}
-			}
-		}
-
-		pool.Delete(userPassEnc)
-
-		return 200, ""
 	}
+
+	var body map[string]interface{}
+	if err := json.Unmarshal(reqBody, &body); err != nil {
+
+		return http.StatusBadRequest, http.StatusText(http.StatusBadRequest)
+	}
+
+	if proceed, data, err := checkLockID(store, state, body["ID"].(string)); err != nil {
+
+		switch err.(type) {
+
+		case *s.ItemNotFoundError:
+			return http.StatusUnprocessableEntity, http.StatusText(http.StatusUnprocessableEntity)
+
+		case *api.ResponseError:
+			{
+				re := err.(*api.ResponseError)
+				return re.StatusCode, re.Error()
+			}
+
+		default:
+			{
+				logger.WithError(err).Error("unable to check lock")
+				return http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError)
+			}
+		}
+
+	} else if !proceed {
+
+		w.Header().Set("Content-Type", "application/json")
+		return http.StatusConflict, data
+	}
+
+	if err := store.Delete(fmt.Sprintf("%s-lock", state)); err != nil {
+
+		switch err.(type) {
+
+		case *api.ResponseError:
+			{
+				re := err.(*api.ResponseError)
+				return re.StatusCode, re.Error()
+			}
+
+		default:
+			{
+				logger.WithError(err).Error("unable to remove lock")
+				return http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError)
+			}
+		}
+	}
+
+	pool.Delete(userPassEnc)
+
+	return 200, ""
 }
 
 func stateHandler(pool s.Pool, w http.ResponseWriter, r *http.Request) (int, string) {
@@ -330,6 +330,7 @@ func getEnv(key, fallback string) string {
 	return fallback
 }
 
+// RunServer starts the Vault Backend TCP server
 func RunServer() {
 
 	if _, debug := os.LookupEnv("DEBUG"); debug {

@@ -10,6 +10,7 @@ import (
 	"strings"
 )
 
+// Encode compresses data using ZLIB and returns its BASE64 representation.
 func Encode(data []byte) (str string, err error) {
 
 	var buf bytes.Buffer
@@ -37,6 +38,7 @@ func Encode(data []byte) (str string, err error) {
 	return
 }
 
+// Decode converts and decompresses the BASE64-encoded data, returning the original byte array.
 func Decode(data string) (bt []byte, err error) {
 
 	var decoder io.ReadCloser
@@ -50,11 +52,8 @@ func Decode(data string) (bt []byte, err error) {
 	if err != nil && err != io.ErrUnexpectedEOF {
 
 		return
-
-	} else {
-
-		err = nil
 	}
 
+	err = nil
 	return
 }

@@ -277,13 +277,11 @@ func (p *MockPool) Get(identifier string) (val s.Store, err error) {
 	if val, ok = p.stores[identifier]; ok {
 
 		return
-
-	} else {
-
-		val = NewMockStore()
-		p.stores[identifier] = val
-		return
 	}
+
+	val = NewMockStore()
+	p.stores[identifier] = val
+	return
 }
 
 func (p *MockPool) Delete(identifier string) {

@@ -10,8 +10,9 @@ import (
 	"time"
 )
 
+// Vault is a client to communicate with an instance of Hashicorp's Vault.
 type Vault struct {
-	roleId, secretId, prefix string
+	roleID, secretID, prefix string
 	client                   *api.Client
 
 	tokenExpiration time.Time
@@ -19,10 +20,12 @@ type Vault struct {
 	m sync.Mutex
 }
 
-func NewWithToken(vaultURL, token, prefix string) (*Vault, error) {
+// NewWithToken creates a new Vault client using an authentication token.
+// VaultURL is the URL of the Vault server to connect to.
+// prefix is the string prefix used when storing the secrets in Vault.
+func NewWithToken(vaultURL, token, prefix string) (out *Vault, err error) {
 
 	var v Vault
-	var err error
 	if v.client, err = api.NewClient(&api.Config{Address: vaultURL}); err != nil {
 
 		return nil, err
@@ -34,17 +37,20 @@ func NewWithToken(vaultURL, token, prefix string) (*Vault, error) {
 	return &v, nil
 }
 
-func NewWithAppRole(vaultURL, roleId, secretId, prefix string) (*Vault, error) {
+// NewWithAppRole creates a new Vault client using AppRole as the authentication method.
+// The token retrieved using roleID and secretID is automatically refreshed.
+// VaultURL is the URL of the Vault server to connect to.
+// prefix is the string prefix used when storing the secrets in Vault.
+func NewWithAppRole(vaultURL, roleID, secretID, prefix string) (out *Vault, err error) {
 
 	var v Vault
-	var err error
 	if v.client, err = api.NewClient(&api.Config{Address: vaultURL}); err != nil {
 
 		return nil, err
 	}
 
-	v.roleId = roleId
-	v.secretId = secretId
+	v.roleID = roleID
+	v.secretID = secretID
 	v.prefix = prefix
 
 	if err = v.authenticate(); err != nil {
@@ -55,25 +61,24 @@ func NewWithAppRole(vaultURL, roleId, secretId, prefix string) (*Vault, error) {
 	return &v, nil
 }
 
-func (v *Vault) authenticate() error {
+func (v *Vault) authenticate() (err error) {
 
 	options := map[string]interface{}{
-		"role_id":   v.roleId,
-		"secret_id": v.secretId,
+		"role_id":   v.roleID,
+		"secret_id": v.secretID,
 	}
 
-	if secret, err := v.client.Logical().Write("auth/approle/login", options); err != nil {
+	var secret *api.Secret
+	if secret, err = v.client.Logical().Write("auth/approle/login", options); err != nil {
 
 		return err
+	}
 
-	} else {
+	v.client.SetToken(secret.Auth.ClientToken)
+	v.tokenExpiration = time.Now()
+	if secret.Auth.Renewable {
 
-		v.client.SetToken(secret.Auth.ClientToken)
-		v.tokenExpiration = time.Now()
-		if secret.Auth.Renewable {
-
-			v.tokenExpiration = v.tokenExpiration.Add(time.Duration(secret.Auth.LeaseDuration-60) * time.Second)
-		}
+		v.tokenExpiration = v.tokenExpiration.Add(time.Duration(secret.Auth.LeaseDuration-60) * time.Second)
 	}
 
 	return nil
@@ -82,7 +87,7 @@ func (v *Vault) authenticate() error {
 func (v *Vault) refreshToken() error {
 
 	// only refresh the token when using AppRole
-	if v.roleId == "" && v.secretId == "" {
+	if v.roleID == "" && v.secretID == "" {
 
 		return nil
 	}
@@ -104,6 +109,7 @@ func (v *Vault) refreshToken() error {
 	return nil
 }
 
+// Set populates a Vault secret content.
 func (v *Vault) Set(name, data string) error {
 
 	if err := v.refreshToken(); err != nil {
@@ -120,60 +126,58 @@ func (v *Vault) Set(name, data string) error {
 	return nil
 }
 
-func (v *Vault) SetBin(name string, data []byte) error {
+// SetBin populates a Vault secret content using binary data.
+func (v *Vault) SetBin(name string, data []byte) (err error) {
 
-	if value, err := Encode(data); err != nil {
+	var value string
+	if value, err = Encode(data); err != nil {
 
-		return err
-
-	} else {
-
-		return v.Set(name, value)
+		return
 	}
+
+	return v.Set(name, value)
 }
 
-func (v *Vault) Get(name string) (string, error) {
+// Get retrieves the content of a Vault secret.
+func (v *Vault) Get(name string) (out string, err error) {
 
-	if err := v.refreshToken(); err != nil {
+	if err = v.refreshToken(); err != nil {
 
-		return "", err
+		return
 	}
 
-	if secret, err := v.client.Logical().Read(fmt.Sprintf("secret/data/%s/%s", v.prefix, name)); err != nil {
+	var secret *api.Secret
+	if secret, err = v.client.Logical().Read(fmt.Sprintf("secret/data/%s/%s", v.prefix, name)); err != nil {
 
-		return "", err
-
-	} else {
-
-		if secret == nil {
-
-			return "", &s.ItemNotFoundError{}
-		}
-
-		if data, err := secret.Data["data"].(map[string]interface{}); !err {
-
-			return "", errors.New("unable to convert secret data")
-
-		} else {
-
-			return data["value"].(string), nil
-		}
+		return
 	}
+
+	if secret == nil {
+
+		return "", &s.ItemNotFoundError{}
+	}
+
+	if data, ok := secret.Data["data"].(map[string]interface{}); ok {
+
+		return data["value"].(string), nil
+	}
+
+	return "", errors.New("unable to convert secret data")
 }
 
+// GetBin retrieves the binary content of a Vault secret.
 func (v *Vault) GetBin(name string) (out []byte, err error) {
 
-	if value, err := v.Get(name); err != nil {
+	var value string
+	if value, err = v.Get(name); err != nil {
 
-		return nil, err
-
-	} else {
-
-		out, err = Decode(value)
+		return
 	}
-	return
+
+	return Decode(value)
 }
 
+// Delete removes a secret from Vault.
 func (v *Vault) Delete(name string) error {
 
 	if err := v.refreshToken(); err != nil {
