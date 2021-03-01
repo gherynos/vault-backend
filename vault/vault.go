@@ -3,17 +3,18 @@ package vault
 import (
 	"errors"
 	"fmt"
+	"sync"
+	"time"
+
 	s "github.com/gherynos/vault-backend/store"
 	"github.com/hashicorp/vault/api"
 	log "github.com/sirupsen/logrus"
-	"sync"
-	"time"
 )
 
 // Vault is a client to communicate with an instance of Hashicorp's Vault.
 type Vault struct {
-	roleID, secretID, prefix string
-	client                   *api.Client
+	roleID, secretID, prefix, store string
+	client                          *api.Client
 
 	tokenExpiration time.Time
 
@@ -23,7 +24,7 @@ type Vault struct {
 // NewWithToken creates a new Vault client using an authentication token.
 // VaultURL is the URL of the Vault server to connect to.
 // prefix is the string prefix used when storing the secrets in Vault.
-func NewWithToken(vaultURL, token, prefix string) (out *Vault, err error) {
+func NewWithToken(vaultURL, token, prefix, store string) (out *Vault, err error) {
 
 	var v Vault
 	if v.client, err = api.NewClient(&api.Config{Address: vaultURL}); err != nil {
@@ -32,6 +33,7 @@ func NewWithToken(vaultURL, token, prefix string) (out *Vault, err error) {
 	}
 
 	v.prefix = prefix
+	v.store = store
 	v.client.SetToken(token)
 
 	return &v, nil
@@ -41,7 +43,7 @@ func NewWithToken(vaultURL, token, prefix string) (out *Vault, err error) {
 // The token retrieved using roleID and secretID is automatically refreshed.
 // VaultURL is the URL of the Vault server to connect to.
 // prefix is the string prefix used when storing the secrets in Vault.
-func NewWithAppRole(vaultURL, roleID, secretID, prefix string) (out *Vault, err error) {
+func NewWithAppRole(vaultURL, roleID, secretID, prefix, store string) (out *Vault, err error) {
 
 	var v Vault
 	if v.client, err = api.NewClient(&api.Config{Address: vaultURL}); err != nil {
@@ -52,6 +54,7 @@ func NewWithAppRole(vaultURL, roleID, secretID, prefix string) (out *Vault, err 
 	v.roleID = roleID
 	v.secretID = secretID
 	v.prefix = prefix
+	v.store = store
 
 	if err = v.authenticate(); err != nil {
 
@@ -117,7 +120,7 @@ func (v *Vault) Set(name, data string) error {
 		return err
 	}
 
-	if _, err := v.client.Logical().Write(fmt.Sprintf("secret/data/%s/%s", v.prefix, name),
+	if _, err := v.client.Logical().Write(fmt.Sprintf("%s/data/%s/%s", v.store, v.prefix, name),
 		map[string]interface{}{"data": map[string]interface{}{"value": data}}); err != nil {
 
 		return err
@@ -147,7 +150,7 @@ func (v *Vault) Get(name string) (out string, err error) {
 	}
 
 	var secret *api.Secret
-	if secret, err = v.client.Logical().Read(fmt.Sprintf("secret/data/%s/%s", v.prefix, name)); err != nil {
+	if secret, err = v.client.Logical().Read(fmt.Sprintf("%s/data/%s/%s", v.store, v.prefix, name)); err != nil {
 
 		return
 	}
@@ -185,7 +188,7 @@ func (v *Vault) Delete(name string) error {
 		return err
 	}
 
-	if _, err := v.client.Logical().Delete(fmt.Sprintf("secret/metadata/%s/%s", v.prefix, name)); err != nil {
+	if _, err := v.client.Logical().Delete(fmt.Sprintf("%s/metadata/%s/%s", v.store, v.prefix, name)); err != nil {
 
 		return err
 	}

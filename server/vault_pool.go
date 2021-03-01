@@ -2,16 +2,17 @@ package server
 
 import (
 	"encoding/base64"
+	"strings"
+	"sync"
+
 	s "github.com/gherynos/vault-backend/store"
 	"github.com/gherynos/vault-backend/vault"
 	log "github.com/sirupsen/logrus"
-	"strings"
-	"sync"
 )
 
 // VaultPool is an implementation of Pool that manages Vault stores.
 type VaultPool struct {
-	vaultURL, prefix string
+	vaultURL, prefix, store string
 
 	stores map[string]*vault.Vault
 	mutex  sync.Mutex
@@ -20,9 +21,9 @@ type VaultPool struct {
 // NewVaultPool creates a new pool of Vault stores.
 // VaultURL is the URL of the Vault server to connect to.
 // prefix is the string prefix used when storing the secrets in Vault.
-func NewVaultPool(vaultURL, prefix string) s.Pool {
+func NewVaultPool(vaultURL, prefix, store string) s.Pool {
 
-	vp := &VaultPool{vaultURL: vaultURL, prefix: prefix}
+	vp := &VaultPool{vaultURL: vaultURL, prefix: prefix, store: store}
 	vp.stores = make(map[string]*vault.Vault)
 
 	return vp
@@ -51,12 +52,9 @@ func (vp *VaultPool) Get(identifier string) (val s.Store, err error) {
 	userPass := strings.Split(string(dec), ":")
 	var vt *vault.Vault
 	if userPass[0] == "TOKEN" {
-
-		vt, err = vault.NewWithToken(vp.vaultURL, userPass[1], vp.prefix)
-
+		vt, err = vault.NewWithToken(vp.vaultURL, userPass[1], vp.prefix, vp.store)
 	} else {
-
-		vt, err = vault.NewWithAppRole(vp.vaultURL, userPass[0], userPass[1], vp.prefix)
+		vt, err = vault.NewWithAppRole(vp.vaultURL, userPass[0], userPass[1], vp.prefix, vp.store)
 	}
 	if err != nil {
 

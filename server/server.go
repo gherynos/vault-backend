@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	s "github.com/gherynos/vault-backend/store"
-	"github.com/hashicorp/vault/api"
-	log "github.com/sirupsen/logrus"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
+
+	s "github.com/gherynos/vault-backend/store"
+	"github.com/hashicorp/vault/api"
+	log "github.com/sirupsen/logrus"
 )
 
 // Version defines the version of the server
@@ -341,6 +342,7 @@ func RunServer() {
 
 	vaultURL := getEnv("VAULT_URL", "http://localhost:8200")
 	vaultPrefix := getEnv("VAULT_PREFIX", "vbk")
+	vaultStore := getEnv("VAULT_STORE", "secret")
 	address := getEnv("LISTEN_ADDRESS", ":8080")
 	tlsCrt := getEnv("TLS_CRT", "")
 	tlsKey := getEnv("TLS_KEY", "")
@@ -348,7 +350,7 @@ func RunServer() {
 	log.Infof("Vault Backend version %s listening on %s", Version, address)
 	log.Debugf("Vault URL: %s, secret prefix: %s", vaultURL, vaultPrefix)
 
-	http.Handle("/state/", handler{NewVaultPool(vaultURL, vaultPrefix), stateHandler})
+	http.Handle("/state/", handler{NewVaultPool(vaultURL, vaultPrefix, vaultStore), stateHandler})
 
 	if tlsCrt != "" && tlsKey != "" {
 
