@@ -21,6 +21,7 @@ type VaultPool struct {
 // NewVaultPool creates a new pool of Vault stores.
 // VaultURL is the URL of the Vault server to connect to.
 // prefix is the string prefix used when storing the secrets in Vault.
+// store the store path used when storing secrets.
 func NewVaultPool(vaultURL, prefix, store string) s.Pool {
 
 	vp := &VaultPool{vaultURL: vaultURL, prefix: prefix, store: store}

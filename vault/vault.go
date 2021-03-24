@@ -24,6 +24,7 @@ type Vault struct {
 // NewWithToken creates a new Vault client using an authentication token.
 // VaultURL is the URL of the Vault server to connect to.
 // prefix is the string prefix used when storing the secrets in Vault.
+// store the store path used when storing secrets.
 func NewWithToken(vaultURL, token, prefix, store string) (out *Vault, err error) {
 
 	var v Vault
@@ -43,6 +44,7 @@ func NewWithToken(vaultURL, token, prefix, store string) (out *Vault, err error)
 // The token retrieved using roleID and secretID is automatically refreshed.
 // VaultURL is the URL of the Vault server to connect to.
 // prefix is the string prefix used when storing the secrets in Vault.
+// store the store path used when storing secrets.
 func NewWithAppRole(vaultURL, roleID, secretID, prefix, store string) (out *Vault, err error) {
 
 	var v Vault
