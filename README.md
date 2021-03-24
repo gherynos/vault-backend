@@ -45,8 +45,8 @@ where `<STATE_NAME>` is an arbitrary value used to distinguish the backends.
 
 With the above configuration, Terraform connects to a vault-backend server running locally on port 8080 when loading/storing/locking the state, and the server manages the following secrets in Vault:
 
-- `/secret/vbk/<STATE_NAME>`
-- `/secret/vbk/<STATE_NAME>-lock`
+- `/<VAULT_STORE>/<VAULT_PREFIX>/<STATE_NAME>`
+- `/<VAULT_STORE>/<VAULT_PREFIX>/<STATE_NAME>-lock`
 
 the latter gets created when a lock is acquired and deleted when released.
 
@@ -56,6 +56,7 @@ The following environment variables can be set to change the configuration:
 
 - `VAULT_URL` (default `http://localhost:8200`) the URL of the Vault server
 - `VAULT_PREFIX` (default `vbk`) the prefix used when storing the secrets
+- `VAULT_STORE` (default `secret`) the store path used when storing secrets
 - `LISTEN_ADDRESS` (default `0.0.0.0:8080`) the listening address and port
 - `TLS_CRT` and `TLS_KEY` to set the path of the TLS certificate and key files
 - `DEBUG` to enable verbose logging
@@ -64,7 +65,7 @@ The following environment variables can be set to change the configuration:
 
 The policy associated to the AppRole used by the server needs to grant access to the secrets.
 
-I.e., for a `<STATE_NAME>` set as `cloud-services` and the default `VAULT_PREFIX`:
+I.e., for a `<STATE_NAME>` set as `cloud-services` and the default `VAULT_PREFIX` and `VAULT_STORE`:
 
 ```vault
 path "secret/data/vbk/cloud-services"
