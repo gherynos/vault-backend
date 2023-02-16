@@ -1,13 +1,14 @@
 package server
 
 import (
-	s "github.com/gherynos/vault-backend/store"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/suite"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	s "github.com/gherynos/vault-backend/store"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
 type ServerTestSuite struct {
