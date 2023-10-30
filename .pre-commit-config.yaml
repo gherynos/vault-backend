@@ -46,4 +46,3 @@ repos:
       - id: go-vet
       - id: go-cyclo
         args: [-over=15]
-      - id: go-lint

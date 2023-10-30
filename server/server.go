@@ -15,7 +15,7 @@ import (
 )
 
 // Version defines the version of the server
-const Version = "0.4.1"
+const Version = "0.4.2"
 
 func checkLockID(store s.Store, state, id string) (proceed bool, data string, err error) {
 
