@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"io"
-	"io/ioutil"
 	"strings"
 )
 
@@ -48,8 +47,8 @@ func Decode(data string) (bt []byte, err error) {
 	}
 
 	defer decoder.Close()
-	bt, err = ioutil.ReadAll(decoder)
-	if err != nil && err != io.ErrUnexpectedEOF {
+	bt, err = io.ReadAll(decoder)
+	if err != nil && !errors.Is(err, io.ErrUnexpectedEOF) {
 
 		return
 	}

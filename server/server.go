@@ -3,9 +3,9 @@ package server
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 
@@ -15,7 +15,7 @@ import (
 )
 
 // Version defines the version of the server
-const Version = "0.4.2"
+const Version = "0.4.3"
 
 func checkLockID(store s.Store, state, id string) (proceed bool, data string, err error) {
 
@@ -44,17 +44,16 @@ func stateHandlerGet(logger *log.Entry, store s.Store, state string, w http.Resp
 	data, err := store.GetBin(state)
 	if err != nil {
 
-		switch err.(type) {
+		var itemNotFoundError *s.ItemNotFoundError
+		var responseError *api.ResponseError
+		switch {
 
-		case *s.ItemNotFoundError:
+		case errors.As(err, &itemNotFoundError):
 			return http.StatusNotFound, http.StatusText(http.StatusNotFound)
-
-		case *api.ResponseError:
+		case errors.As(err, &responseError):
 			{
-				re := err.(*api.ResponseError)
-				return re.StatusCode, re.Error()
+				return responseError.StatusCode, responseError.Error()
 			}
-
 		default:
 			{
 				logger.WithError(err).Error("unable to get state")
@@ -79,17 +78,16 @@ func stateHandlerPost(logger *log.Entry, store s.Store, state string, r *http.Re
 
 	if proceed, data, err := checkLockID(store, state, r.URL.Query().Get("ID")); err != nil {
 
-		switch err.(type) {
+		var itemNotFoundError *s.ItemNotFoundError
+		var responseError *api.ResponseError
+		switch {
 
-		case *s.ItemNotFoundError:
+		case errors.As(err, &itemNotFoundError):
 			return http.StatusUnprocessableEntity, http.StatusText(http.StatusUnprocessableEntity)
-
-		case *api.ResponseError:
+		case errors.As(err, &responseError):
 			{
-				re := err.(*api.ResponseError)
-				return re.StatusCode, re.Error()
+				return responseError.StatusCode, responseError.Error()
 			}
-
 		default:
 			{
 				logger.WithError(err).Error("unable to check lock")
@@ -105,21 +103,20 @@ func stateHandlerPost(logger *log.Entry, store s.Store, state string, r *http.Re
 
 	var reqBody []byte
 	var err error
-	if reqBody, err = ioutil.ReadAll(r.Body); err != nil {
+	if reqBody, err = io.ReadAll(r.Body); err != nil {
 
 		return http.StatusBadRequest, http.StatusText(http.StatusBadRequest)
 	}
 
 	if err := store.SetBin(state, reqBody); err != nil {
 
-		switch err.(type) {
+		var responseError *api.ResponseError
+		switch {
 
-		case *api.ResponseError:
+		case errors.As(err, &responseError):
 			{
-				re := err.(*api.ResponseError)
-				return re.StatusCode, re.Error()
+				return responseError.StatusCode, responseError.Error()
 			}
-
 		default:
 			{
 				logger.WithError(err).Error("unable to store state")
@@ -139,13 +136,15 @@ func stateHandlerLock(logger *log.Entry, store s.Store, state string, r *http.Re
 	data, err := store.GetBin(name)
 	if err != nil {
 
-		switch err.(type) {
+		var itemNotFoundError *s.ItemNotFoundError
+		var responseError *api.ResponseError
+		switch {
 
-		case *s.ItemNotFoundError:
+		case errors.As(err, &itemNotFoundError):
 			{
 				var reqBody []byte
 				var err error
-				if reqBody, err = ioutil.ReadAll(r.Body); err != nil {
+				if reqBody, err = io.ReadAll(r.Body); err != nil {
 
 					return http.StatusBadRequest, http.StatusText(http.StatusBadRequest)
 				}
@@ -158,13 +157,10 @@ func stateHandlerLock(logger *log.Entry, store s.Store, state string, r *http.Re
 
 				return 200, ""
 			}
-
-		case *api.ResponseError:
+		case errors.As(err, &responseError):
 			{
-				re := err.(*api.ResponseError)
-				return re.StatusCode, re.Error()
+				return responseError.StatusCode, responseError.Error()
 			}
-
 		default:
 			{
 				logger.WithError(err).Error("unable to retrieve lock")
@@ -183,7 +179,7 @@ func stateHandlerUnlock(logger *log.Entry, store s.Store, state string, pool s.P
 
 	var reqBody []byte
 	var err error
-	if reqBody, err = ioutil.ReadAll(r.Body); err != nil {
+	if reqBody, err = io.ReadAll(r.Body); err != nil {
 
 		return http.StatusBadRequest, http.StatusText(http.StatusBadRequest)
 	}
@@ -196,17 +192,16 @@ func stateHandlerUnlock(logger *log.Entry, store s.Store, state string, pool s.P
 
 	if proceed, data, err := checkLockID(store, state, body["ID"].(string)); err != nil {
 
-		switch err.(type) {
+		var itemNotFoundError *s.ItemNotFoundError
+		var responseError *api.ResponseError
+		switch {
 
-		case *s.ItemNotFoundError:
+		case errors.As(err, &itemNotFoundError):
 			return http.StatusUnprocessableEntity, http.StatusText(http.StatusUnprocessableEntity)
-
-		case *api.ResponseError:
+		case errors.As(err, &responseError):
 			{
-				re := err.(*api.ResponseError)
-				return re.StatusCode, re.Error()
+				return responseError.StatusCode, responseError.Error()
 			}
-
 		default:
 			{
 				logger.WithError(err).Error("unable to check lock")
@@ -222,14 +217,13 @@ func stateHandlerUnlock(logger *log.Entry, store s.Store, state string, pool s.P
 
 	if err := store.Delete(fmt.Sprintf("%s-lock", state)); err != nil {
 
-		switch err.(type) {
+		var responseError *api.ResponseError
+		switch {
 
-		case *api.ResponseError:
+		case errors.As(err, &responseError):
 			{
-				re := err.(*api.ResponseError)
-				return re.StatusCode, re.Error()
+				return responseError.StatusCode, responseError.Error()
 			}
-
 		default:
 			{
 				logger.WithError(err).Error("unable to remove lock")
@@ -261,15 +255,14 @@ func stateHandler(pool s.Pool, w http.ResponseWriter, r *http.Request) (int, str
 	store, err = pool.Get(userPassEnc)
 	if err != nil {
 
-		switch err.(type) {
+		var responseError *api.ResponseError
+		switch {
 
-		case *api.ResponseError:
+		case errors.As(err, &responseError):
 			{
-				re := err.(*api.ResponseError)
-				logger.Debugf("error connecting to Vault: %d - %s", re.StatusCode, re.Error())
-				return re.StatusCode, re.Error()
+				logger.Debugf("error connecting to Vault: %d - %s", responseError.StatusCode, responseError.Error())
+				return responseError.StatusCode, responseError.Error()
 			}
-
 		default:
 			{
 				logger.WithError(err).Error("error connecting to Vault")
