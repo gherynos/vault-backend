@@ -31,7 +31,7 @@ repos:
           - go
         exclude: binary|\.bin|go.mod$
   - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.37.0
+    rev: v0.38.0
     hooks:
       - id: markdownlint
   - repo: https://github.com/adrienverge/yamllint
@@ -41,8 +41,15 @@ repos:
   - repo: https://github.com/dnephin/pre-commit-golang
     rev: v0.5.1
     hooks:
+      - id: go-cyclo
+        args: [-over=20]
+  - repo: https://github.com/tekwizely/pre-commit-golang
+    rev: v1.0.0-rc.1
+    hooks:
       - id: go-fmt
       - id: go-imports
-      - id: go-vet
-      - id: go-cyclo
-        args: [-over=15]
+      - id: go-staticcheck-mod
+      - id: go-critic
+      - id: go-vet-mod
+      - id: go-mod-tidy
+      - id: go-revive
