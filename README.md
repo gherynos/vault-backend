@@ -84,6 +84,16 @@ path "secret/metadata/vbk/cloud-services-lock"
 }
 ```
 
+## Docker
+
+The Docker images for Vault Backend are available here: <https://hub.docker.com/r/gherynos/vault-backend>
+
+Example execution command:
+
+```shell
+docker run -d -p 8080:8080 -e VAULT_URL=https://some.vault.address:8200 gherynos/vault-backend
+```
+
 ## Author
 
 > GitHub [@gherynos](https://github.com/gherynos)
