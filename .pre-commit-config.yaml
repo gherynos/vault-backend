@@ -3,7 +3,7 @@
 exclude: (CMakeFiles|cmake_modules|docs|target)\/
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
+    rev: v6.0.0
     hooks:
       - id: check-json
       - id: check-merge-conflict
@@ -31,11 +31,11 @@ repos:
           - go
         exclude: binary|\.bin|go.mod$
   - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.39.0
+    rev: v0.47.0
     hooks:
       - id: markdownlint
   - repo: https://github.com/adrienverge/yamllint
-    rev: v1.35.1
+    rev: v1.37.1
     hooks:
       - id: yamllint
   - repo: https://github.com/dnephin/pre-commit-golang
@@ -44,7 +44,7 @@ repos:
       - id: go-cyclo
         args: [-over=20]
   - repo: https://github.com/tekwizely/pre-commit-golang
-    rev: v1.0.0-rc.1
+    rev: v1.0.0-rc.3
     hooks:
       - id: go-fmt
       - id: go-imports
